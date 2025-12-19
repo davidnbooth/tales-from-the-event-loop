@@ -1,0 +1,19 @@
+<html>
+  <body>
+    <script>
+      window.onunhandledrejection = function(event) {
+        console.log('Unhandled rejection:', event.reason);
+      };
+      window.onrejectionhandled = function(event) {
+        console.log('handled rejection:', event.reason);
+      };
+
+      const p = Promise.reject("Late catch example");
+
+      setTimeout(() => {
+        p.catch(err => console.log("Caught later:", err));
+      }, 100);
+
+    </script>
+  </body>
+</html>
