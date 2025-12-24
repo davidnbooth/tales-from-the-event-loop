@@ -1,0 +1,131 @@
+<html><body><script>
+window.onunhandledrejection = (e) => { console.log("unhandledrejection") };
+window.onrejectionhandled = (e) => { console.log("rejectionhandled") };
+async function meep () {
+    const promise = (async () => {
+    	throw new Error('haha!');
+    })();
+
+    setTimeout(() => { promise.catch(() => console.log('caught promise!')) }, 1000);
+}
+
+meep();	
+</script></body></html>
+
+This is my example code.
+
+This is what happens inside meep():
+
+1 - the promise rejects right away and goes onto the microtask queue
+2 - the setTimeout schedules its task on the task queue
+3 - synchronous code execution ends, the microtask queue must clear
+4 - the rejected promise comes off the microtask queue with no handlers, so an `unhandledrejection` event is put on the task queue
+5 - the next task comes off the task queue.  The setTimeout isn't done yet, so this is the unhandledrejection.
+6 - the handler we registered for the unhandledrejection events runs, *logging its message* to the console.
+7 - the unhandledrejection bubbles up (we didnt call preventDefault), so the browser *logs an error* message to the console.
+8 - the next task comes off the task queue.  This registers a catch handler on the promise.
+9 - the catch handler runs, because the promise is rejected, *logging a message* to the console.
+10 - because "a handler was attached to the promise after its rejection had caused an unhandledrejection event" (MDN quote), a `rejectionhandled` event is put on the task queue.
+11 - I'm _pretty sure_ that at this point a task is also put on the task queue which will retroactively change the error message generated in step 7 to a normal message.
+12 - the handler we registered for the rejectionhandled events runs, *logging its message* to the console.
+13 - the task from step 11 runs, changing the message.
+
+Questions:
+
+- In step 5, if the setTimeout were ready (e.g. you ran it with timeout 0), it would run before the 'unhandledrejection' event comes off the task queue.  In this case the unhandledrejection never comes off the task queue, so I'm guessing the task is just considered not runnable anymore and it eventually gets garbage collected.  Is that right?
+- In step 9, how/when does the catch handler run?  Is it the catch handler synchronously registered and because the promise is already rejected it synchronously schedules a microtask to run the catch handler?
+- What are the details of #10?  I believe the unhandledrejection needs to not only be put on the task queue, but needs to have come off and run to completion (though not necessarily bubbled up) without the promise ever having a handler.  Is that correct?
+- Am I right about step 11?  Why is this done?
+
+
+Details on #10:
+- Put preventDefault in the window event handler:  The rejectionhandled still fires, there just isn't an error logged to the console.
+- Assign the catch handler inside the window event handler (either by putting it after the promise is defined or by putting catch on e.promise): 'rejectionhandled' never fires, presumably because the rejection was handled.
+
+
+Detaiols on #11:
+If you schedule a microtask inside the 'rejectionhandled' handler, it will run before the message changes, indicating that a microtask to change the text has not been scheduled at this point.  If you do a setTimeout or await inside the handler, yielding to the task queue, you'll see that the text changes before your task comes off, indicating that a task was already scheduled.
+
+<html><body><script>
+window.onunhandledrejection = (e) => { console.log("unhandledrejection") };
+window.onrejectionhandled = (e) => {
+	console.log("rejectionhandled")
+	let j = 0;
+	for (let i=0; i<= 10**9; i++) {
+		j += i;
+	}
+	console.log(j);
+	setTimeout(() => {
+		console.log("time!");
+			let j = 0;
+		for (let i=0; i<= 10**9; i++) {
+			j += i;
+		}
+		console.log(j);
+	}, 0);
+	queueMicrotask(() => {
+		console.log("micro");
+		let j = 0;
+		for (let i=0; i<= 10**9; i++) {
+			j += i;
+		}
+		console.log(j)
+	});
+};
+async function meep () {
+    const promise = (async () => {
+    	throw new Error('haha!');
+    })();
+
+    setTimeout(() => { promise.catch(() => console.log('caught promise!')) }, 1000);
+}
+
+meep();	
+</script></body></html>
+
+
+Details on #12:
+Its weird.  It is possible to construct a scenario where an await-ed promise rejects, killing its execution context, and then is later caught with a 'rejectionhandled'.  The code after the originally await-ed promise is not retroactively run as though the promise didn't have an unhandled rejection, so why do this weird retroactive thing?
+
+<html><body><script>
+let p;
+window.onunhandledrejection = (e) => {
+	console.log("unhandledrejection", e.promise);
+	p = e.promise;
+};
+setTimeout(() => {
+	p.catch(() => console.log("caught!"));
+}, 4000)
+window.onrejectionhandled = (e) => {
+	console.log("rejectionhandled")
+	let j = 0;
+	for (let i=0; i<= 10**9; i++) {
+		j += i;
+	}
+	console.log(j);
+	setTimeout(() => {
+		console.log("time!");
+			let j = 0;
+		for (let i=0; i<= 10**9; i++) {
+			j += i;
+		}
+		console.log(j);
+	}, 0);
+	queueMicrotask(() => {
+		console.log("micro");
+		let j = 0;
+		for (let i=0; i<= 10**9; i++) {
+			j += i;
+		}
+	});
+};
+async function meep () {
+    const promise = await (async () => {
+    	throw new Error('haha!');
+    })();
+
+    setTimeout(() => { promise.catch(() => console.log('caught promise!')) }, 1000);
+}
+
+meep();	
+</script></body></html>

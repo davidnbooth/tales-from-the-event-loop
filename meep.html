@@ -1,0 +1,26 @@
+<html><body><script>
+window.onunhandledrejection = (e) => { console.log("unhandledrejection") };
+window.onrejectionhandled = (e) => { console.log("rejectionhandled") };
+async function meep () {
+    const promise = (async () => {
+    	throw new Error('haha!');
+    })();
+
+    setTimeout(() => { promise.catch(() => console.log('caught promise!')); queueMicrotask(() => console.log('q')); }, 1000);
+}
+
+meep();	
+</script></body></html>
+
+<!-- html><body><script>
+window.onrejectionhandled = (e) => {console.log("rejectionhandled")};
+async function meep () {
+    const promise = (async () => {
+    	throw new Error('haha!');
+    })();
+    window.onunhandledrejection = (e) => {promise.catch(() => console.log('caught promise!'))};
+}
+
+
+meep();	
+</script></body></html> -->

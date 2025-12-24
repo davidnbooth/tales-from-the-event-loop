@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<body>
+    <script>
+        async function meep () {
+            const promise = (async () => {
+                throw new Error('Haha!');
+            })();
+
+            console.log('Me first?');
+            await new Promise(resolve => setTimeout(resolve, 0));
+            console.log('Me next?');
+
+            const results = await Promise.allSettled([promise]);
+            console.log('Then the results?', results);
+        }
+
+        meep();
+    </script>
+</body>
+</html>
