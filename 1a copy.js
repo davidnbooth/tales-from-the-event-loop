@@ -2,16 +2,16 @@
 //   console.log('rejectionHandled');
 // });
 async function main() {
-  const promise = (async () => {
+  const promise = new Promise((resolve, reject) => {
     console.log("1");
-    throw new Error('haha!');
-  })();
+    reject("haha!");
+  });
 
   console.log("2");
-  await new Promise(resolve => {
+  await (async () => {
     console.log("3");
-    resolve();
-  });
+    return;
+  })();
   console.log("4");
 
   promise.catch(() => {console.log("5")});
